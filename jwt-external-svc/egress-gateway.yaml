@@ -1,0 +1,78 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: istio-egressgateway
+spec:
+  selector:
+    istio: egressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - numbersapi.com
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: egressgateway-for-numbersapi
+spec:
+  host: istio-egressgateway.istio-system.svc.cluster.local
+  subsets:
+  - name: numbersapi
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: direct-numbesrapi-through-egress-gateway
+spec:
+  hosts:
+  - numbersapi.com
+  gateways:
+  - istio-egressgateway
+  - mesh
+  http:
+  - match:
+    - gateways:
+      - mesh
+      port: 80
+    route:
+    - destination:
+        host: istio-egressgateway.istio-system.svc.cluster.local
+        subset: numbersapi
+        port:
+          number: 80
+      weight: 100
+  - match:
+    - gateways:
+      - istio-egressgateway
+      port: 80
+    route:
+    - destination:
+        host: numbersapi.com
+        port:
+          number: 80
+      weight: 100
+---
+apiVersion: "networking.istio.io/v1alpha3"
+kind: "DestinationRule"
+metadata:
+  name: "egress-gateway-foo"
+  namespace: "istio-system"
+spec:
+  host: "istio-egressgateway.istio-system.svc.cluster.local"
+---
+# JWT policy for external service
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "jwt-external"
+spec:
+  targets:
+  - name: egress-gateway-foo
+  origins:
+  - jwt:
+      issuer: "testing@secure.istio.io"
+      jwksUri: "https://raw.githubusercontent.com/istio/istio/release-1.3/security/tools/jwt/samples/jwks.json"
+  principalBinding: USE_ORIGIN

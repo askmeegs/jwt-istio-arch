@@ -1,0 +1,74 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: echo-gateway
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - "*"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: echo-ingress
+spec:
+  hosts:
+  - "*"
+  gateways:
+  - echo-gateway
+  http:
+  - route:
+    - destination:
+        host: echo
+        port:
+          number: 80
+---
+# TOKEN=$(curl https://raw.githubusercontent.com/istio/istio/release-1.3/security/tools/jwt/samples/demo.jwt -s)
+apiVersion: "authentication.istio.io/v1alpha1"
+kind: "Policy"
+metadata:
+  name: "echo-jwt"
+spec:
+  targets:
+  - name: echo
+  origins:
+  - jwt:
+      issuer: "testing@secure.istio.io"
+      jwksUri: "https://raw.githubusercontent.com/istio/istio/release-1.2/security/tools/jwt/samples/jwks.json"
+  principalBinding: USE_ORIGIN
+# ---
+# # echo external (with policy) redirects to echo (internal, no policy) for rules
+# apiVersion: networking.istio.io/v1alpha3
+# kind: VirtualService
+# metadata:
+#   name: echo-redirect
+# spec:
+#   hosts:
+#   - "echo.default.svc.cluster.local"
+#   http:
+#   - route:
+#     - destination:
+#         host: echo
+#         port:
+#           number: 80
+# ---
+# # apply any spanning (ingress and in-mesh) rules on this VS
+# apiVersion: networking.istio.io/v1alpha3
+# kind: VirtualService
+# metadata:
+#   name: echo-internal
+# spec:
+#   hosts:
+#   - echo
+#   http:
+#   - route:
+#     - destination:
+#         host: echo.default.svc.cluster.local
+#         port:
+#           number: 80
